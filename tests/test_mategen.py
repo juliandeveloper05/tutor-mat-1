@@ -7,6 +7,7 @@ del que la produjo (tablas de verdad, fuerza bruta, evaluación numérica).
 Se ejecuta con:  python3 -m unittest discover -s tests -v
 """
 
+import json
 import random
 import unittest
 
@@ -24,6 +25,7 @@ from mategen.logica.formula import equivalentes, escribir
 from mategen.relaciones import equivalencia as req
 from mategen.relaciones import orden as rord
 from mategen.relaciones import propiedades as rprop
+from mategen import serial
 from mategen.render import a_html, a_markdown, a_texto
 
 SEMILLAS = range(60)
@@ -215,6 +217,114 @@ class TestExamen(unittest.TestCase):
         html = a_html(ex)
         self.assertIn("<!doctype html>", html)
         self.assertEqual(html.count("<pre"), html.count("</pre>"))
+
+
+class TestSerializacion(unittest.TestCase):
+    """La capa que consume el frontend.
+
+    Se controla que el JSON sea válido, que traiga los datos para dibujar y —lo
+    más delicado— que el modo examen no filtre las respuestas.
+    """
+
+    def test_todo_ejercicio_serializa_y_trae_visual(self):
+        for clave, generador in GENERADORES.items():
+            for s in range(8):
+                ej = generador(random.Random(s))
+                datos = serial.ejercicio_a_json(ej)
+                texto = json.dumps(datos, ensure_ascii=False)  # no debe explotar
+                self.assertGreater(len(texto), 100)
+                self.assertTrue(datos["visual"].get("tipo"), f"{clave}: visual sin tipo")
+                self.assertTrue(datos["practica"].get("tipo"), f"{clave}: practica sin tipo")
+
+    def test_el_modo_examen_no_revela_la_respuesta(self):
+        for clave, generador in GENERADORES.items():
+            for s in range(8):
+                ej = generador(random.Random(s))
+                datos = serial.ejercicio_a_json(ej, con_soluciones=False)
+                for prohibida in ("pasos", "respuesta", "observacion", "verificacion"):
+                    self.assertNotIn(prohibida, datos, f"{clave}: se filtró {prohibida}")
+                self.assertNotIn("correcta", datos["practica"], clave)
+                self.assertNotIn("correctas", datos["practica"], clave)
+                for item in datos["practica"].get("items", []):
+                    self.assertNotIn("correcta", item, clave)
+                    self.assertNotIn("valor", item, clave)
+                # El visual sólo puede traer claves de presentación.
+                permitidas = serial._VISUAL_PUBLICO.get(datos["visual"]["tipo"])
+                self.assertIsNotNone(permitidas, f"{clave}: tipo visual sin lista blanca")
+                self.assertLessEqual(set(datos["visual"]), set(permitidas), clave)
+
+    def test_las_opciones_multiples_tienen_una_sola_correcta(self):
+        for clave in ("dominio", "simplificacion", "derivacion", "identidad"):
+            for s in range(15):
+                ej = GENERADORES[clave](random.Random(s))
+                practica = ej.practica
+                bloques = practica.get("items", [practica])
+                for bloque in bloques:
+                    if "opciones" not in bloque:
+                        continue
+                    opciones = bloque["opciones"]
+                    self.assertEqual(
+                        len(opciones), len(set(opciones)), f"{clave}: opciones repetidas"
+                    )
+                    self.assertGreaterEqual(len(opciones), 2, clave)
+                    self.assertIn(bloque["correcta"], range(len(opciones)), clave)
+
+    def test_el_dominio_serializado_coincide_con_el_objeto(self):
+        """Los extremos del JSON tienen que describir el mismo conjunto."""
+        for s in range(40):
+            ej = fdom.generar(random.Random(s))
+            datos = serial.dominio_a_json(ej["dominio"])
+            self.assertEqual(datos["texto"], str(ej["dominio"]))
+            for original, serializado in zip(ej["dominio"].intervalos, datos["intervalos"]):
+                for lado in ("izq", "der"):
+                    valor = getattr(original, lado)
+                    if valor is None:
+                        self.assertIsNone(serializado[lado])
+                    else:
+                        self.assertEqual(serializado[lado]["num"], valor.numerator)
+                        self.assertEqual(serializado[lado]["den"], valor.denominator)
+
+    def test_el_hasse_serializado_reconstruye_el_orden(self):
+        for s in range(25):
+            o = rord.generar_orden(random.Random(s))
+            datos = serial.orden_a_json(o)
+            aristas = {tuple(p) for p in datos["hasse"]}
+            self.assertEqual(aristas, o.hasse)
+            self.assertEqual(
+                rord.clausura_transitiva(datos["elems"], aristas), o.estricto
+            )
+
+    def test_el_cubo_de_partes_sale_exacto(self):
+        """P({a,b,c}) tiene que dar los 8 vértices y las 12 aristas del cubo."""
+        o = rord.orden_partes(["a", "b", "c"])
+        datos = serial.orden_a_json(o)
+        self.assertEqual(len(datos["elems"]), 8)
+        self.assertEqual(len(datos["hasse"]), 12)
+        vistos = {tuple(bits) for bits in datos["bits"].values()}
+        self.assertEqual(len(vistos), 8, "los vértices deben ser distintos")
+        # Cada arista del Hasse cambia exactamente un bit: es el cubo.
+        for x, y in datos["hasse"]:
+            diferencias = sum(
+                1 for a, b in zip(datos["bits"][x], datos["bits"][y]) if a != b
+            )
+            self.assertEqual(diferencias, 1, "una arista debe agregar un solo elemento")
+
+    def test_las_muestras_respetan_el_dominio(self):
+        for s in range(30):
+            ej = fdom.generar(random.Random(s))
+            for x, y in serial.muestrear(ej["f"], ej["dominio"]):
+                if y is not None:
+                    self.assertTrue(
+                        ej["dominio"].contiene(x),
+                        f"se muestreó un punto fuera del dominio: {x}",
+                    )
+
+    def test_examen_completo_en_json(self):
+        for modo in MODOS:
+            datos = serial.examen_a_json(generar_examen(modo=modo, semilla=5))
+            texto = json.dumps(datos, ensure_ascii=False)
+            self.assertGreater(len(texto), 1000)
+            self.assertEqual(len(datos["ejercicios"]), len(MODOS[modo]))
 
 
 def analiza(A, R, propiedad):

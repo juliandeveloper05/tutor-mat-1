@@ -6,8 +6,10 @@ típicos) y la nota de cómo se verificó la respuesta por computadora.
 """
 
 import random
+import zlib
 from typing import Callable, Dict, List
 
+from . import serial
 from .conjuntos import expr as cexpr
 from .conjuntos import extension as cext
 from .conjuntos import venn as cvenn
@@ -22,6 +24,54 @@ from .logica.formula import escribir, tabla_markdown
 from .relaciones import equivalencia as req
 from .relaciones import orden as rord
 from .relaciones import propiedades as rprop
+
+
+# ==========================================================================
+# Ayudas para el modo práctica
+# ==========================================================================
+
+def _azar_estable(*partes: str) -> random.Random:
+    """Un generador determinístico derivado del contenido, no del examen.
+
+    Importa que la práctica **no** consuma azar del rng del examen: si lo
+    hiciera, agregar o quitar una opción cambiaría todos los ejercicios
+    siguientes y una misma semilla dejaría de dar el mismo examen que antes.
+    Se usa crc32 y no hash() porque hash() de un str cambia en cada proceso.
+    """
+    semilla = zlib.crc32("|".join(partes).encode("utf-8"))
+    return random.Random(semilla)
+
+
+def _opciones(correcta: str, alternativas: List[str], cantidad: int = 4) -> Dict:
+    """Arma una lista de opciones con una sola correcta, ya mezclada.
+
+    Devuelve {"opciones": [...], "correcta": índice}. Las alternativas que
+    coinciden con la respuesta correcta se descartan, así nunca hay dos
+    opciones válidas.
+    """
+    distintas = [a for a in dict.fromkeys(alternativas) if a != correcta]
+    rng = _azar_estable(correcta, *distintas)
+    rng.shuffle(distintas)
+    opciones = [correcta] + distintas[: max(0, cantidad - 1)]
+    rng.shuffle(opciones)
+    return {"opciones": opciones, "correcta": opciones.index(correcta)}
+
+
+def _practica_leyes(pasos, nombres_ley: List[str]) -> Dict:
+    """Práctica común a simplificación e igualdades: nombrar la ley de cada paso.
+
+    Es exactamente lo que la cátedra exige y lo que más puntos cuesta olvidar:
+    una cadena sin los nombres de las leyes no suma.
+    """
+    items = []
+    for datos in pasos:
+        ley = datos["ley"]
+        items.append({
+            "antes": datos["antes"],
+            "despues": datos["despues"],
+            **_opciones(ley, list(nombres_ley)),
+        })
+    return {"tipo": "nombrar-ley", "items": items}
 
 
 # ==========================================================================
@@ -75,6 +125,24 @@ def ej_simplificacion(rng: random.Random) -> Ejercicio:
     ej.verificacion = (
         "La equivalencia entre el enunciado y el resultado se comprobó con la tabla de "
         "verdad completa (todas las valuaciones posibles)."
+    )
+    pasos_json = [
+        {
+            "ley": ley,
+            "antes": serial.formula_completa(antes),
+            "despues": serial.formula_completa(despues),
+            "completa": serial.formula_completa(completa),
+        }
+        for ley, antes, despues, completa in pasos
+    ]
+    ej.visual = {
+        "tipo": "cadena-logica",
+        "inicial": serial.formula_completa(enunciado),
+        "final": serial.formula_completa(resultado),
+        "pasos": pasos_json,
+    }
+    ej.practica = _practica_leyes(
+        pasos_json, [nombre for nombre, _ley in lleyes.LEYES]
     )
     return ej
 
@@ -149,6 +217,35 @@ def ej_derivacion(rng: random.Random) -> Ejercicio:
         "La derivación fue hallada por el programa usando sólo reglas de inferencia, y "
         "además se confirmó con la tabla de verdad que (P₁ ∧ … ∧ Pₙ) → C es una tautología."
     )
+    renglones = [
+        {
+            "n": i,
+            "formula": serial.formula_completa(formula),
+            "regla": regla,
+            "refs": refs,
+        }
+        for i, (formula, regla, refs) in enumerate(prueba, start=1)
+    ]
+    ej.visual = {
+        "tipo": "derivacion",
+        "premisas": [serial.formula_completa(p) for p in premisas],
+        "meta": serial.formula_completa(meta),
+        "renglones": renglones,
+    }
+    # Se pregunta la regla sólo en los renglones deducidos, no en las premisas.
+    ej.practica = {
+        "tipo": "nombrar-regla",
+        "items": [
+            {
+                "n": r["n"],
+                "formula": r["formula"],
+                "refs": r["refs"],
+                **_opciones(r["regla"], list(_REGLAS)),
+            }
+            for r in renglones
+            if r["refs"]
+        ],
+    }
     return ej
 
 
@@ -221,6 +318,42 @@ def ej_cuantificadores(rng: random.Random) -> Ejercicio:
         "testigo informado es el de menor módulo, y las justificaciones universales sólo "
         "se emiten cuando la verificación es completa (conjunto de verdad finito)."
     )
+    # Para dibujar la recta numérica alcanza con una ventana chica: los
+    # predicados del banco ya se estabilizaron mucho antes de ±12.
+    ventana = list(range(-12, 13))
+    ej.visual = {
+        "tipo": "cuantificadores",
+        "ventana": ventana,
+        "predicados": [
+            {
+                "nombre": p.nombre,
+                "texto": p.texto,
+                "finito": p.finito,
+                "conjunto_verdad": p.verdad_texto(),
+                "puntos": [x for x in ventana if p.func(x)],
+                "todos_los_puntos": p.conjunto_verdad() if p.finito else None,
+            }
+            for p in preds
+        ],
+        "items": [
+            {
+                "enunciado": it.enunciado,
+                "valor": it.valor,
+                "cuant": it.cuant,
+                "forma": it.forma,
+                "predicados": [it.p.nombre, it.q.nombre],
+                "puntos": [x for x in ventana
+                           if lcuant._eval_cuerpo(it.forma, it.p, it.q, x)],
+            }
+            for it in items
+        ],
+    }
+    ej.practica = {
+        "tipo": "verdadero-falso",
+        "items": [
+            {"enunciado": it.enunciado, "correcta": it.valor} for it in items
+        ],
+    }
     return ej
 
 
@@ -261,6 +394,31 @@ def ej_conjuntos_extension(rng: random.Random) -> Ejercicio:
         "El programa recalculó todos los datos del enunciado a partir de los conjuntos "
         "hallados y verificó que coinciden exactamente."
     )
+    ej.visual = {
+        "tipo": "venn-elementos",
+        "letras": ["A", "B", "C"],
+        "conjuntos": {
+            "A": sorted(d["A"]), "B": sorted(d["B"]), "C": sorted(d["C"]),
+        },
+        # Cada elemento va en una sola región: es lo que se dibuja.
+        "regiones": {
+            "a": sorted(d["A"] - d["B"] - d["C"]),
+            "b": sorted(d["B"] - d["A"] - d["C"]),
+            "c": sorted(d["C"] - d["A"] - d["B"]),
+            "ab": sorted((d["A"] & d["B"]) - d["C"]),
+            "ac": sorted((d["A"] & d["C"]) - d["B"]),
+            "bc": sorted((d["B"] & d["C"]) - d["A"]),
+            "abc": sorted(d["A"] & d["B"] & d["C"]),
+        },
+        "datos": [{"clave": k, "valor": v} for k, v in d["datos"]],
+    }
+    ej.practica = {
+        "tipo": "conjuntos-por-extension",
+        "campos": ["A", "B", "C"],
+        "correctas": {
+            "A": sorted(d["A"]), "B": sorted(d["B"]), "C": sorted(d["C"]),
+        },
+    }
     return ej
 
 
@@ -304,6 +462,31 @@ def ej_venn(rng: random.Random) -> Ejercicio:
         "consistente por construcción; el programa verificó además que suman el total y "
         "que cada respuesta coincide con las regiones correspondientes."
     )
+    ctx = d["contexto"]
+    ej.visual = {
+        "tipo": "venn-conteo",
+        "letras": list(ctx["letras"]),
+        "nombres": list(ctx["elementos"]),
+        "unidad": ctx["unidad"],
+        "regiones": d["regiones"],
+        "total": d["total"],
+        # Qué regiones pinta cada pregunta, para resaltarlas al responder.
+        "resaltados": [
+            {"pregunta": i, "regiones": rs}
+            for i, rs in enumerate([
+                ["a", "b", "c"],
+                ["b", "ab"],
+                ["a", "ac", "b", "bc"],
+            ])
+        ],
+    }
+    ej.practica = {
+        "tipo": "numerica",
+        "items": [
+            {"texto": p["texto"], "expresion": p["expresion"], "valor": p["valor"]}
+            for p in d["preguntas"]
+        ],
+    }
     return ej
 
 
@@ -350,6 +533,28 @@ def ej_identidad_conjuntos(rng: random.Random) -> Ejercicio:
         "La igualdad se comprobó interpretando ambas expresiones en el álgebra de Boole "
         "libre: se calculó qué regiones del diagrama de Venn ocupa cada miembro y se "
         "verificó que son idénticas."
+    )
+    variables = sorted(
+        set(cexpr.variables(enunciado)) | set(cexpr.variables(resultado))
+    )
+    pasos_json = [
+        {"ley": ley, "completa": serial.expresion_completa(expr)}
+        for ley, expr in pasos
+    ]
+    ej.visual = {
+        "tipo": "cadena-conjuntos",
+        "variables": variables,
+        "inicial": serial.expresion_completa(enunciado),
+        "final": serial.expresion_completa(resultado),
+        "pasos": pasos_json,
+        # Las regiones que pinta cada miembro: dibujadas lado a lado se ve que
+        # son las mismas, que es exactamente cómo lo verifica el programa.
+        "celdas_inicial": serial.celdas_a_json(enunciado, variables),
+        "celdas_final": serial.celdas_a_json(resultado, variables),
+    }
+    ej.practica = _practica_leyes(
+        [{"ley": p["ley"], "antes": None, "despues": p["completa"]} for p in pasos_json],
+        sorted(set(cexpr.NOMBRE_LEY.values()) | {"Definición de diferencia (A − B = A ∩ B̅)"}),
     )
     return ej
 
@@ -410,7 +615,44 @@ def ej_relacion_propiedades(rng: random.Random) -> Ejercicio:
         "El programa recorrió todos los pares de A × A para decidir cada propiedad, y "
         "comprobó que las relaciones corregidas de b) y c) efectivamente cumplen lo pedido."
     )
+    ej.visual = {
+        "tipo": "relacion",
+        "A": d["A"],
+        "pares": serial.pares_a_json(d["R"]),
+        "propiedades": _propiedades_a_json(d["A"], d["R"]),
+        "correcciones": {
+            "agregar_reflexiva": serial.pares_a_json(d["agregar_reflexiva"]),
+            "quitar_antisimetrica": serial.pares_a_json(d["quitar_antisimetrica"]),
+            "agregar_simetrica": serial.pares_a_json(d["agregar_simetrica"]),
+            "quitar_irreflexiva": serial.pares_a_json(d["quitar_irreflexiva"]),
+        },
+    }
+    ej.practica = {
+        "tipo": "propiedades",
+        "propiedades": ["reflexiva", "irreflexiva", "simetrica", "antisimetrica", "transitiva"],
+        "correctas": {
+            nombre: rprop.analizar(d["A"], d["R"])[nombre][0]
+            for nombre in ("reflexiva", "irreflexiva", "simetrica", "antisimetrica", "transitiva")
+        },
+    }
     return ej
+
+
+def _propiedades_a_json(A: List[str], R) -> Dict:
+    """Cada propiedad con su veredicto y los pares que lo justifican."""
+    analisis = rprop.analizar(A, R)
+    salida = {}
+    for nombre, (vale, testigos) in analisis.items():
+        if nombre == "transitiva":
+            # Los testigos son ternas (par1, par2, par que falta).
+            detalle = [
+                {"primero": list(p1), "segundo": list(p2), "falta": list(falta)}
+                for p1, p2, falta in testigos[:4]
+            ]
+        else:
+            detalle = [list(p) for p in testigos[:4]]
+        salida[nombre] = {"vale": vale, "testigos": detalle}
+    return salida
 
 
 def ej_relacion_equivalencia(rng: random.Random) -> Ejercicio:
@@ -498,6 +740,23 @@ def ej_relacion_equivalencia(rng: random.Random) -> Ejercicio:
         "posibles; cuando la relación es de equivalencia se verificó además que las clases "
         "forman una partición de A (disjuntas y de unión total)."
     )
+    ej.visual = {
+        "tipo": "equivalencia",
+        "A": d["A"],
+        "pares": serial.pares_a_json(d["R"]),
+        "propiedades": _propiedades_a_json(d["A"], d["R"]),
+        "es_equivalencia": d["es_equivalencia"],
+        "propiedad_rota": d["propiedad_rota"],
+        # Los bloques agrupan los nodos al dibujar el grafo de la relación.
+        "clases": {x: c for x, c in d["clases"].items()} if d["es_equivalencia"] else None,
+        "cociente": d["cociente"] if d["es_equivalencia"] else None,
+        "particion": d["particion"],
+    }
+    ej.practica = {
+        "tipo": "si-no",
+        "pregunta": "¿R es una relación de equivalencia?",
+        "correcta": d["es_equivalencia"],
+    }
     return ej
 
 
@@ -622,7 +881,39 @@ def ej_relacion_orden(rng: random.Random) -> Ejercicio:
         "transitiva, y todos los elementos particulares se calcularon recorriendo el orden "
         "completo."
     )
+    ej.visual = {
+        "tipo": "hasse",
+        **serial.orden_a_json(o),
+        "particulares": serial.particulares_a_json(o, B),
+        "consigna_subconjunto": texto_spec,
+    }
+    ej.practica = _practica_particulares(o, B)
     return ej
+
+
+def _practica_particulares(o, B) -> Dict:
+    """Elegir máximo, mínimo, supremo e ínfimo del subconjunto.
+
+    «No tiene» es una opción legítima y es justamente la que más se falla: la
+    diferencia entre maximal y máximo se juega ahí.
+    """
+    p = serial.particulares_a_json(o, B)
+    etiquetas = dict(o.etiquetas)
+    return {
+        "tipo": "elementos-particulares",
+        "subconjunto": list(B),
+        "etiquetas": etiquetas,
+        "opciones": list(o.elems),
+        "preguntas": [
+            {"clave": clave, "texto": texto, "correcta": p[clave]}
+            for clave, texto in (
+                ("maximo", "Máximo de B"),
+                ("minimo", "Mínimo de B"),
+                ("supremo", "Supremo de B"),
+                ("infimo", "Ínfimo de B"),
+            )
+        ],
+    }
 
 
 def ej_integrador_partes(rng: random.Random) -> Ejercicio:
@@ -706,6 +997,13 @@ def ej_integrador_partes(rng: random.Random) -> Ejercicio:
         "por inclusión; el diagrama es la reducción transitiva y los elementos particulares "
         "se calcularon sobre el orden completo."
     )
+    ej.visual = {
+        "tipo": "hasse",
+        **serial.orden_a_json(o),
+        "particulares": serial.particulares_a_json(o, todos),
+        "conjunto_base": base,
+    }
+    ej.practica = _practica_particulares(o, todos)
     return ej
 
 
@@ -743,7 +1041,76 @@ def ej_funcion_dominio(rng: random.Random) -> Ejercicio:
         "que la fórmula se puede calcular exactamente cuando el punto pertenece al dominio "
         "informado."
     )
+    ej.visual = {
+        "tipo": "dominio",
+        "funcion": d["texto"],
+        "dominio": serial.dominio_a_json(d["dominio"]),
+        "muestras": serial.muestrear(d["f"], d["dominio"]),
+    }
+    alternativos = _dominios_alternativos(d["dominio"])
+    ej.practica = {
+        "tipo": "opcion-multiple",
+        "pregunta": f"¿Cuál es el dominio natural de {d['texto']}?",
+        **_opciones(str(d["dominio"]), [str(x) for x in alternativos]),
+    }
     return ej
+
+
+def _mismo_conjunto(a, b, muestras: int = 400) -> bool:
+    """¿Dos dominios son el mismo conjunto?
+
+    Se muestrea una grilla **y además los extremos exactos**: sin eso no se
+    distinguiría [2 ; +∞) de (2 ; +∞), que difieren en un solo punto.
+    """
+    puntos = [-12 + 24 * i / muestras for i in range(muestras + 1)]
+    for dom in (a, b):
+        for i in dom.intervalos:
+            if i.izq is not None:
+                puntos.append(float(i.izq))
+            if i.der is not None:
+                puntos.append(float(i.der))
+        puntos.extend(float(e) for e in dom.excluidos)
+    return all(a.contiene(x) == b.contiene(x) for x in puntos)
+
+
+def _dominios_alternativos(dom):
+    """Dominios parecidos pero realmente distintos, para las opciones erróneas.
+
+    Cada candidato corresponde a un error típico: confundir corchete con
+    paréntesis, olvidarse de la rama negativa de una cuadrática, o no excluir el
+    punto que anula el denominador.
+    """
+    from .funciones.intervalos import Dominio, Intervalo, reales
+
+    candidatos = [reales()]
+    candidatos.append(
+        Dominio(
+            [
+                Intervalo(
+                    i.izq,
+                    i.der,
+                    (not i.izq_cerrado) if i.izq is not None else False,
+                    (not i.der_cerrado) if i.der is not None else False,
+                )
+                for i in dom.intervalos
+            ],
+            dom.excluidos,
+        )
+    )
+    if len(dom.intervalos) > 1:
+        candidatos.append(Dominio([dom.intervalos[-1]], dom.excluidos))
+        candidatos.append(Dominio([dom.intervalos[0]], dom.excluidos))
+    if dom.excluidos:
+        candidatos.append(Dominio(dom.intervalos, []))
+        punto = dom.excluidos[0]
+        # Excluir el opuesto (error de signo al despejar) y confundir "≠" con ">".
+        candidatos.append(Dominio(dom.intervalos, [-punto]))
+        candidatos.append(Dominio([Intervalo(punto, None, False, False)]))
+    else:
+        finitos = [i.izq for i in dom.intervalos if i.izq is not None]
+        if finitos:
+            candidatos.append(Dominio([Intervalo(None, None, False, False)], [finitos[0]]))
+    return [c for c in candidatos if not _mismo_conjunto(c, dom)]
 
 
 def ej_funcion_biyectiva(rng: random.Random) -> Ejercicio:
@@ -759,7 +1126,17 @@ def ej_funcion_biyectiva(rng: random.Random) -> Ejercicio:
         ),
         puntaje=15,
     )
-    ej.agregar("a) Dominio natural", f"Dom f = **{d['dominio']}**")
+    nota_restriccion = (
+        "\n\nNo confundir con el dominio **restringido** del inciso c): el natural es el "
+        "conjunto más grande donde la fórmula tiene sentido, y acá la fórmula se puede "
+        "calcular para cualquier real. La restricción aparece recién cuando se busca la "
+        "inversa."
+        if str(d["dominio_natural"]) != str(d["dominio"])
+        else ""
+    )
+    ej.agregar(
+        "a) Dominio natural", f"Dom f = **{d['dominio_natural']}**" + nota_restriccion
+    )
     ej.agregar("b) Inyectividad y sobreyectividad", d["analisis"])
     ej.agregar("c) Redefinición", d["redefinir"])
     ej.agregar(
@@ -774,7 +1151,10 @@ def ej_funcion_biyectiva(rng: random.Random) -> Ejercicio:
         f"f ({d['dominio']}): al invertir una función, dominio e imagen se intercambian. "
         "Gráficamente, f y f⁻¹ son simétricas respecto de la recta y = x.",
     )
-    ej.respuesta = f"Dom f = {d['dominio']}, Im f = {d['imagen']}, **{d['inversa_texto']}**"
+    ej.respuesta = (
+        f"Dom natural = {d['dominio_natural']} · biyectiva de {d['dominio']} en "
+        f"{d['imagen']} · **{d['inversa_texto']}**"
+    )
     ej.observacion = (
         "Una función admite inversa **si y sólo si** es biyectiva. Por eso casi siempre hay "
         "que redefinir: restringir el dominio arregla la inyectividad y achicar el "
@@ -785,6 +1165,28 @@ def ej_funcion_biyectiva(rng: random.Random) -> Ejercicio:
         "Se comprobó numéricamente que f⁻¹(f(x)) = x en cientos de puntos del dominio y que "
         "f(x) cae siempre dentro de la imagen declarada."
     )
+    ej.visual = {
+        "tipo": "funcion-inversa",
+        "funcion": d["texto"],
+        "inversa": d["inversa_texto"],
+        "dominio_natural": serial.dominio_a_json(d["dominio_natural"]),
+        "dominio": serial.dominio_a_json(d["dominio"]),
+        "imagen": serial.dominio_a_json(d["imagen"]),
+        "muestras_f": serial.muestrear(d["f"], d["dominio"]),
+        # f⁻¹ se muestrea sobre la imagen, que es su dominio.
+        "muestras_inversa": serial.muestrear(d["finv"], d["imagen"]),
+        "inyectiva": d["inyectiva"],
+        "sobreyectiva": d["sobreyectiva"],
+    }
+    ej.practica = {
+        "tipo": "verdadero-falso",
+        "items": [
+            {"enunciado": "f es inyectiva en su dominio natural",
+             "correcta": d["inyectiva"]},
+            {"enunciado": "f : Dom f → ℝ es sobreyectiva",
+             "correcta": d["sobreyectiva"]},
+        ],
+    }
     return ej
 
 
@@ -830,6 +1232,32 @@ def ej_funcion_composicion(rng: random.Random) -> Ejercicio:
         "Ambos dominios se controlaron evaluando g(f(x)) y f(g(x)) en 900 puntos y "
         "comparando con el conjunto informado."
     )
+    gf = lambda x: d["g"](d["f"](x))
+    fg = lambda x: d["f"](d["g"](x))
+    ej.visual = {
+        "tipo": "composicion",
+        "f": d["f_texto"],
+        "g": d["g_texto"],
+        "gf": {
+            "texto": d["gf_texto"],
+            "dominio": serial.dominio_a_json(d["gf_dominio"]),
+            "muestras": serial.muestrear(gf, d["gf_dominio"]),
+        },
+        "fg": {
+            "texto": d["fg_texto"],
+            "dominio": serial.dominio_a_json(d["fg_dominio"]),
+            "muestras": serial.muestrear(fg, d["fg_dominio"]),
+        },
+    }
+    # Emparejar cada composición con su dominio: es el punto exacto donde se
+    # falla, porque las dos fórmulas se parecen pero los dominios no.
+    ej.practica = {
+        "tipo": "emparejar",
+        "consigna": "Asociar cada composición con su dominio",
+        "izquierda": [d["gf_texto"], d["fg_texto"]],
+        "derecha": sorted({str(d["gf_dominio"]), str(d["fg_dominio"])}),
+        "correctas": [str(d["gf_dominio"]), str(d["fg_dominio"])],
+    }
     return ej
 
 

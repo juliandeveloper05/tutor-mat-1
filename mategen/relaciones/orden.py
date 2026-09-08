@@ -54,6 +54,10 @@ class Orden:
         self.elems = elems
         # Etiqueta visible de cada elemento (para órdenes de subconjuntos).
         self.etiquetas = etiquetas or {e: e for e in elems}
+        # Sólo para el orden por inclusión: qué subconjunto es cada elemento.
+        # Permite ubicar los nodos en el cubo exacto al dibujarlos en 3D.
+        self.base: Optional[List[str]] = None
+        self.conjuntos: Optional[Dict[str, Set[str]]] = None
         self.estricto = estricto                       # x < y
         self.relacion = estricto | {(x, x) for x in elems}   # x ≼ y
         self.hasse = reduccion_transitiva(elems, estricto)
@@ -198,4 +202,7 @@ def orden_partes(base: List[str]) -> Orden:
         for y in claves
         if x != y and conjuntos[x] < conjuntos[y]
     }
-    return Orden(claves, estricto, etiquetas)
+    orden = Orden(claves, estricto, etiquetas)
+    orden.base = list(base)
+    orden.conjuntos = conjuntos
+    return orden

@@ -82,6 +82,30 @@ def escribir(e: SExpr) -> str:
     return izq + simbolo + der
 
 
+def escribir_latex(e: SExpr) -> str:
+    """La misma expresión en LaTeX, para renderizar con KaTeX en el frontend.
+
+    En LaTeX el complemento se escribe siempre con barra arriba —
+    \\overline{A}, \\overline{A \\cup B}— que es como se escribe a mano, así que
+    no hace falta la variante con exponente c.
+    """
+    if isinstance(e, SVar):
+        return e.nombre
+    if isinstance(e, Universo):
+        return "U"
+    if isinstance(e, Vacio):
+        return r"\emptyset"
+    if isinstance(e, Comp):
+        return r"\overline{" + escribir_latex(e.a) + "}"
+    izq, der = escribir_latex(e.a), escribir_latex(e.b)
+    if isinstance(e.a, (Union, Inter, Dif)) and type(e.a) is not type(e):
+        izq = "(" + izq + ")"
+    if isinstance(e.b, (Union, Inter, Dif)):
+        der = "(" + der + ")"
+    simbolo = {Union: r" \cup ", Inter: r" \cap ", Dif: " - "}[type(e)]
+    return izq + simbolo + der
+
+
 # --------------------------------------------------------------------------
 # Traducción a fórmulas proposicionales (x ∈ A  ↔  la variable A es verdadera)
 # --------------------------------------------------------------------------

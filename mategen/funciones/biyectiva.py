@@ -32,7 +32,9 @@ def generar(rng: random.Random) -> Dict:
         den_txt = sumar("x", c)
         texto = f"f(x) = ({num_txt}) / ({den_txt})"
         dominio = reales_sin([-c])
+        natural = dominio                     # ya es biyectiva sobre su imagen
         imagen = reales_sin([a])
+        inyectiva, sobreyectiva = True, False
         f = lambda x: (a * x + b) / (x + c)
         finv = lambda y: (b - c * y) / (y - a)
         inv_num = sumar(coef(-c, "x"), b)
@@ -61,9 +63,12 @@ def generar(rng: random.Random) -> Dict:
         a = rng.choice([1, 2])
         cuerpo = f"{coef(a, parentizar(desplazar('x', h)) + '²')}"
         texto = f"f(x) = {sumar(cuerpo, k)}"
+        # Ojo: el dominio **natural** de una cuadrática es todo ℝ. El intervalo
+        # [h ; +∞) aparece recién en c), al restringir para que admita inversa.
         natural = reales()
         dominio = desde(h, True)
         imagen = desde(k, True)
+        inyectiva, sobreyectiva = False, False
         f = lambda x: a * (x - h) ** 2 + k
         finv = lambda y: h + math.sqrt((y - k) / a)
         inversa_texto = f"f⁻¹(x) = {anteponer(h, '√(' + dividir(desplazar('x', k), a) + ')')}"
@@ -93,7 +98,9 @@ def generar(rng: random.Random) -> Dict:
         cuerpo = coef(a, f"e^({desplazar('x', h)})")
         texto = f"f(x) = {sumar(cuerpo, k)}"
         dominio = reales()
+        natural = dominio
         imagen = Dominio([Intervalo(k, None, False, False)])
+        inyectiva, sobreyectiva = True, False
         f = lambda x: a * math.exp(x - h) + k
         finv = lambda y: h + math.log((y - k) / a)
         inversa_texto = f"f⁻¹(x) = {anteponer(h, 'ln(' + dividir(desplazar('x', k), a) + ')')}"
@@ -119,7 +126,9 @@ def generar(rng: random.Random) -> Dict:
         cuerpo = coef(a, f"ln({desplazar('x', h)})")
         texto = f"f(x) = {sumar(cuerpo, k)}"
         dominio = Dominio([Intervalo(h, None, False, False)])
+        natural = dominio
         imagen = reales()
+        inyectiva, sobreyectiva = True, True
         f = lambda x: a * math.log(x - h) + k
         finv = lambda y: h + math.exp((y - k) / a)
         inversa_texto = f"f⁻¹(x) = {anteponer(h, 'e^(' + dividir(desplazar('x', k), a) + ')')}"
@@ -146,7 +155,9 @@ def generar(rng: random.Random) -> Dict:
         cuerpo = f"√({desplazar('x', h)})"
         texto = f"f(x) = {sumar(cuerpo, k)}"
         dominio = desde(h, True)
+        natural = dominio
         imagen = desde(k, True)
+        inyectiva, sobreyectiva = True, False
         f = lambda x: math.sqrt(x - h) + k
         finv = lambda y: (y - k) ** 2 + h
         inversa_texto = f"f⁻¹(x) = {sumar('(' + desplazar('x', k) + ')²', h)}"
@@ -168,7 +179,12 @@ def generar(rng: random.Random) -> Dict:
     return {
         "tipo": tipo,
         "texto": texto,
+        # `dominio` es aquel donde f resulta biyectiva (para la cuadrática, ya
+        # restringido); `dominio_natural` es el que se pide en el inciso a).
         "dominio": dominio,
+        "dominio_natural": natural,
+        "inyectiva": inyectiva,
+        "sobreyectiva": sobreyectiva,
         "imagen": imagen,
         "inversa_texto": inversa_texto,
         "f": f,

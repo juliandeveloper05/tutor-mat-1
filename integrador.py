@@ -14,12 +14,14 @@ No requiere instalar nada: sólo Python 3.8 o superior.
 """
 
 import argparse
+import json
 import random
 import sys
 from pathlib import Path
 
 from mategen.examen import GENERADORES, MODOS, TEMAS, generar_examen
 from mategen.render import a_html, a_markdown, a_texto
+from mategen.serial import examen_a_json
 
 
 def construir_parser() -> argparse.ArgumentParser:
@@ -43,8 +45,8 @@ def construir_parser() -> argparse.ArgumentParser:
                    help="cuántos ejercicios generar cuando se usa --tipo")
     p.add_argument("-s", "--semilla", type=int,
                    help="semilla para reproducir exactamente el mismo examen")
-    p.add_argument("-f", "--formato", default="md", choices=["md", "html", "txt"],
-                   help="formato de salida (por defecto: md)")
+    p.add_argument("-f", "--formato", default="md", choices=["md", "html", "txt", "json"],
+                   help="formato de salida (por defecto: md). json es el que consume la web")
     p.add_argument("-o", "--salida", help="archivo donde escribir (por defecto: pantalla)")
     p.add_argument("--sin-soluciones", action="store_true",
                    help="imprimir sólo los enunciados")
@@ -93,6 +95,10 @@ def main(argv=None) -> int:
         salida = a_html(examen, con_soluciones, args.soluciones_aparte)
     elif args.formato == "txt":
         salida = a_texto(examen, con_soluciones)
+    elif args.formato == "json":
+        salida = json.dumps(
+            examen_a_json(examen, con_soluciones), ensure_ascii=False, indent=2
+        )
     else:
         salida = a_markdown(examen, con_soluciones, args.soluciones_aparte)
 

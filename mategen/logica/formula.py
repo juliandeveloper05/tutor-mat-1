@@ -61,34 +61,63 @@ class Iff(Form):
 # --------------------------------------------------------------------------
 
 _PREC = {Iff: 1, Imp: 2, Or: 3, And: 4, Not: 5}
-_SIMB = {And: " ∧ ", Or: " ∨ ", Imp: " → ", Iff: " ↔ "}
+
+# Dos alfabetos para la misma fórmula: el de la cátedra (para leer en texto) y
+# el de LaTeX (para que el frontend la renderice con KaTeX). Comparten la
+# recursión y las reglas de parentizado, así que no se pueden desincronizar.
+_UNICODE = {
+    "simbolos": {And: " ∧ ", Or: " ∨ ", Imp: " → ", Iff: " ↔ "},
+    "negacion": "¬",
+    "verdadero": "V",
+    "falso": "F",
+}
+_LATEX = {
+    "simbolos": {
+        And: r" \wedge ",
+        Or: r" \vee ",
+        Imp: r" \rightarrow ",
+        Iff: r" \leftrightarrow ",
+    },
+    "negacion": r"\neg ",
+    "verdadero": r"\mathbf{V}",
+    "falso": r"\mathbf{F}",
+}
 
 
 def _prec(f: Form) -> int:
     return _PREC.get(type(f), 6)
 
 
-def escribir(f: Form) -> str:
-    """Devuelve la fórmula como texto, con el mínimo de paréntesis necesario."""
+def _render(f: Form, alfabeto: dict) -> str:
     if isinstance(f, Var):
         return f.nombre
     if isinstance(f, Const):
-        return "V" if f.valor else "F"
+        return alfabeto["verdadero"] if f.valor else alfabeto["falso"]
     if isinstance(f, Not):
-        interno = escribir(f.a)
+        interno = _render(f.a, alfabeto)
         if _prec(f.a) < _prec(f):
             interno = "(" + interno + ")"
-        return "¬" + interno
+        return alfabeto["negacion"] + interno
     # Binarias. Criterio de la cátedra: se parentiza toda subfórmula binaria,
     # salvo cadenas del mismo conectivo asociativo (p ∧ q ∧ r).
-    izq, der = escribir(f.a), escribir(f.b)
+    izq, der = _render(f.a, alfabeto), _render(f.b, alfabeto)
     mismo_asociativo = isinstance(f, (And, Or)) and type(f.a) is type(f)
     if _prec(f.a) < 5 and not mismo_asociativo:
         izq = "(" + izq + ")"
     derecha_libre = isinstance(f, (And, Or)) and type(f.b) is type(f)
     if _prec(f.b) < 5 and not derecha_libre:
         der = "(" + der + ")"
-    return izq + _SIMB[type(f)] + der
+    return izq + alfabeto["simbolos"][type(f)] + der
+
+
+def escribir(f: Form) -> str:
+    """Devuelve la fórmula como texto, con el mínimo de paréntesis necesario."""
+    return _render(f, _UNICODE)
+
+
+def escribir_latex(f: Form) -> str:
+    """La misma fórmula en LaTeX, para renderizar con KaTeX en el frontend."""
+    return _render(f, _LATEX)
 
 
 # --------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 """Estructuras comunes a todos los generadores de ejercicios."""
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import Dict, List
 
 
 @dataclass
@@ -30,6 +30,12 @@ class Ejercicio:
     observacion: str = ""
     # Cómo verificó la máquina que la respuesta es correcta.
     verificacion: str = ""
+    # Datos estructurados para que el frontend dibuje el ejercicio (las regiones
+    # del Venn, las aristas del Hasse, los intervalos del dominio...). La salida
+    # en texto no los usa; existen para no tener que redibujar desde la prosa.
+    visual: Dict = field(default_factory=dict)
+    # Esquema de la respuesta, para poder tomarla y corregirla.
+    practica: Dict = field(default_factory=dict)
 
     def agregar(self, titulo: str, detalle: str) -> None:
         self.pasos.append(Paso(titulo, detalle))
