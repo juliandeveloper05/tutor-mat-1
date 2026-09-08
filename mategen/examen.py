@@ -626,7 +626,9 @@ def ej_relacion_orden(rng: random.Random) -> Ejercicio:
 
 
 def ej_integrador_partes(rng: random.Random) -> Ejercicio:
-    base = ["a", "b"] if rng.random() < 0.5 else ["a", "b", "c"]
+    # Se prefiere el caso de tres elementos: P(A) con 8 subconjuntos da un
+    # diagrama de Hasse (el cubo) mucho más rico para un ejercicio integrador.
+    base = ["a", "b"] if rng.random() < 0.25 else ["a", "b", "c"]
     o = rord.orden_partes(base)
     conjunto = "{" + ", ".join(base) + "}"
     ej = Ejercicio(
