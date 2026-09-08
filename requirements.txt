@@ -1,0 +1,4 @@
+# Dependencias de la API. El paquete `mategen` y la CLI no necesitan ninguna:
+# corren con Python 3.8+ pelado.
+fastapi>=0.110
+uvicorn>=0.27

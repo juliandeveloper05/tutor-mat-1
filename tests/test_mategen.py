@@ -25,7 +25,7 @@ from mategen.logica.formula import equivalentes, escribir
 from mategen.relaciones import equivalencia as req
 from mategen.relaciones import orden as rord
 from mategen.relaciones import propiedades as rprop
-from mategen import serial
+from mategen import correccion, serial
 from mategen.render import a_html, a_markdown, a_texto
 
 SEMILLAS = range(60)
@@ -325,6 +325,98 @@ class TestSerializacion(unittest.TestCase):
             texto = json.dumps(datos, ensure_ascii=False)
             self.assertGreater(len(texto), 1000)
             self.assertEqual(len(datos["ejercicios"]), len(MODOS[modo]))
+
+
+class TestCorreccion(unittest.TestCase):
+    """La corrección tiene que dar 100 con las respuestas correctas y 0 en blanco.
+
+    Es el test que sostiene el modo examen: como el generador es determinístico,
+    el servidor corrige regenerando el examen desde la semilla, sin guardar nada.
+    """
+
+    @staticmethod
+    def _respuestas_correctas(practica):
+        tipo = practica["tipo"]
+        if tipo in ("verdadero-falso", "nombrar-ley", "nombrar-regla"):
+            return [i["correcta"] for i in practica["items"]]
+        if tipo == "numerica":
+            return [i["valor"] for i in practica["items"]]
+        if tipo == "propiedades":
+            return practica["correctas"]
+        if tipo == "si-no":
+            return practica["correcta"]
+        if tipo == "opcion-multiple":
+            return practica["correcta"]
+        if tipo == "elementos-particulares":
+            return {q["clave"]: q["correcta"] for q in practica["preguntas"]}
+        if tipo == "conjuntos-por-extension":
+            return practica["correctas"]
+        if tipo == "emparejar":
+            return practica["correctas"]
+        raise AssertionError(f"tipo de práctica sin corrector: {tipo}")
+
+    def test_cada_tipo_de_practica_se_corrige_perfecto(self):
+        for clave, generador in GENERADORES.items():
+            for s in range(6):
+                ej = generador(random.Random(s))
+                resultado = correccion.corregir(
+                    ej.practica, self._respuestas_correctas(ej.practica)
+                )
+                self.assertGreater(resultado["total"], 0, clave)
+                self.assertEqual(
+                    resultado["aciertos"], resultado["total"],
+                    f"{clave} (semilla {s}): la respuesta correcta no dio todos los aciertos",
+                )
+
+    def test_sin_responder_no_suma(self):
+        for clave, generador in GENERADORES.items():
+            ej = generador(random.Random(1))
+            resultado = correccion.corregir(ej.practica, None)
+            self.assertEqual(resultado["aciertos"], 0, clave)
+
+    def test_examen_completo_da_cien_y_cero(self):
+        for modo in MODOS:
+            examen = generar_examen(modo=modo, semilla=77)
+            perfectas = [
+                self._respuestas_correctas(e.practica) for e in examen["ejercicios"]
+            ]
+            bien = correccion.corregir_examen(examen, perfectas)
+            self.assertEqual(bien["puntos"], bien["puntos_totales"], modo)
+            self.assertTrue(bien["aprobado"], modo)
+
+            mal = correccion.corregir_examen(examen, [None] * len(perfectas))
+            self.assertEqual(mal["puntos"], 0, modo)
+            self.assertFalse(mal["aprobado"], modo)
+
+    def test_una_respuesta_equivocada_resta(self):
+        """Cambiar una respuesta correcta tiene que bajar el puntaje."""
+        examen = generar_examen(modo="integrador", semilla=3)
+        perfectas = [self._respuestas_correctas(e.practica) for e in examen["ejercicios"]]
+        completo = correccion.corregir_examen(examen, perfectas)
+
+        estropeadas = list(perfectas)
+        for i, ej in enumerate(examen["ejercicios"]):
+            if ej.practica["tipo"] == "verdadero-falso":
+                estropeadas[i] = [not v for v in perfectas[i]]
+                break
+        parcial = correccion.corregir_examen(examen, estropeadas)
+        self.assertLess(parcial["puntos"], completo["puntos"])
+
+    def test_el_generador_reconstruye_el_mismo_examen(self):
+        """La corrección depende de esto: misma semilla, mismas respuestas."""
+        for modo in MODOS:
+            uno = generar_examen(modo=modo, semilla=404)
+            otro = generar_examen(modo=modo, semilla=404)
+            self.assertEqual(
+                [e.consigna for e in uno["ejercicios"]],
+                [e.consigna for e in otro["ejercicios"]],
+                modo,
+            )
+            self.assertEqual(
+                [e.practica for e in uno["ejercicios"]],
+                [e.practica for e in otro["ejercicios"]],
+                modo,
+            )
 
 
 def analiza(A, R, propiedad):

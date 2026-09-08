@@ -1345,3 +1345,29 @@ def generar_examen(modo: str = "integrador", semilla: int = None, tema: str = No
         "ejercicios": ejercicios,
         "puntaje_total": total,
     }
+
+
+def generar(modo: str = "integrador", semilla: int = None, tema: str = None,
+            tipo: str = None, cantidad: int = 1) -> Dict:
+    """Punto de entrada único: lo usan tanto la CLI como la API.
+
+    Que sea uno solo importa para la corrección: el servidor tiene que poder
+    reconstruir *exactamente* el mismo examen a partir de los mismos parámetros.
+    """
+    if tipo:
+        if tipo not in GENERADORES:
+            raise ValueError(
+                f"Tipo desconocido: {tipo}. Opciones: {', '.join(GENERADORES)}"
+            )
+        if semilla is None:
+            semilla = random.randrange(1, 10 ** 6)
+        rng = random.Random(semilla)
+        ejercicios = [GENERADORES[tipo](rng) for _ in range(max(1, cantidad))]
+        return {
+            "titulo": f"Práctica de {ejercicios[0].subtema}",
+            "modo": tipo,
+            "semilla": semilla,
+            "ejercicios": ejercicios,
+            "puntaje_total": sum(e.puntaje for e in ejercicios),
+        }
+    return generar_examen(modo=modo, semilla=semilla, tema=tema)

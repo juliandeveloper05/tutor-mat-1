@@ -73,6 +73,40 @@ calculan**, y después se vuelven a comprobar por un camino independiente.
 
 Cada ejercicio del examen termina con una línea que dice cómo fue verificado.
 
+## API
+
+Además de la CLI, el generador se expone por HTTP para la aplicación web. La API
+es una capa fina: toda la matemática vive en el paquete `mategen`.
+
+```bash
+pip install -r requirements.txt
+uvicorn api.index:app --reload        # http://127.0.0.1:8000/docs
+```
+
+| Endpoint | Qué hace |
+|---|---|
+| `GET /api/tipos` | modos, temas y tipos de ejercicio disponibles |
+| `GET /api/examen?semilla=2026&modo=integrador` | genera un examen en JSON |
+| `GET /api/examen?...&soluciones=false` | modo examen: sin resolución ni respuestas |
+| `POST /api/corregir` | corrige un examen a partir de su semilla |
+
+Cada ejercicio viaja con un campo `visual` que trae los datos para dibujarlo (las
+regiones del Venn, las aristas del diagrama de Hasse, los intervalos del dominio,
+los puntos ya muestreados de cada función) y un campo `practica` con el esquema
+de la respuesta.
+
+**No hay base de datos.** Como el generador es determinístico, para corregir
+alcanza con volver a generar el mismo examen a partir de la semilla:
+
+```bash
+curl -X POST localhost:8000/api/corregir -H 'Content-Type: application/json' \
+  -d '{"semilla": 2026, "modo": "integrador", "respuestas": [...]}'
+```
+
+En modo examen el servidor además **filtra** el payload visual con una lista
+blanca por tipo de ejercicio: sin eso, las regiones ya contadas del Venn o los
+elementos particulares del Hasse regalarían la respuesta.
+
 ## Tests
 
 ```bash
@@ -86,10 +120,13 @@ de forma independiente sobre decenas de semillas distintas.
 
 ```
 integrador.py              CLI
+api/index.py               API HTTP (FastAPI)
 mategen/
   examen.py                arma los exámenes y redacta cada ejercicio
+  serial.py                serialización a JSON para el frontend
+  correccion.py            corrección de las respuestas del modo práctica
   render.py                salida en Markdown, texto y HTML
-  ejercicio.py             estructura común (consigna, pasos, respuesta)
+  ejercicio.py             estructura común (consigna, pasos, respuesta, visual)
   logica/                  fórmulas, leyes, derivaciones, cuantificadores
   conjuntos/               expresiones, extensión, Venn
   relaciones/              propiedades, equivalencia, orden

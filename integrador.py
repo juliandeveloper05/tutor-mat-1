@@ -15,11 +15,10 @@ No requiere instalar nada: sólo Python 3.8 o superior.
 
 import argparse
 import json
-import random
 import sys
 from pathlib import Path
 
-from mategen.examen import GENERADORES, MODOS, TEMAS, generar_examen
+from mategen.examen import GENERADORES, MODOS, TEMAS, generar
 from mategen.render import a_html, a_markdown, a_texto
 from mategen.serial import examen_a_json
 
@@ -76,19 +75,13 @@ def main(argv=None) -> int:
         listar()
         return 0
 
-    if args.tipo:
-        semilla = args.semilla if args.semilla is not None else random.randrange(1, 10 ** 6)
-        rng = random.Random(semilla)
-        ejercicios = [GENERADORES[args.tipo](rng) for _ in range(max(1, args.cantidad))]
-        examen = {
-            "titulo": f"Práctica de {ejercicios[0].subtema}",
-            "modo": args.tipo,
-            "semilla": semilla,
-            "ejercicios": ejercicios,
-            "puntaje_total": sum(e.puntaje for e in ejercicios),
-        }
-    else:
-        examen = generar_examen(modo=args.modo, semilla=args.semilla, tema=args.tema)
+    examen = generar(
+        modo=args.modo,
+        semilla=args.semilla,
+        tema=args.tema,
+        tipo=args.tipo,
+        cantidad=args.cantidad,
+    )
 
     con_soluciones = not args.sin_soluciones
     if args.formato == "html":
