@@ -13,6 +13,7 @@ Cualquier candidata que no encaje en esos casos se descarta y se genera otra.
 """
 
 import random
+import re
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple
 
@@ -38,13 +39,13 @@ class Predicado:
             valores = self.conjunto_verdad()
             if not valores:
                 return "∅"
-            return "{" + ", ".join(str(v) for v in valores) + "}"
+            return "{" + ", ".join(_n(v) for v in valores) + "}"
         return self.descripcion_verdad
 
 
 BANCO: List[Predicado] = [
-    Predicado("", "x ≥ 0", lambda x: x >= 0, False, "{x ∈ Z : x ≥ 0}"),
-    Predicado("", "x < 0", lambda x: x < 0, False, "{x ∈ Z : x < 0}"),
+    Predicado("", "x ≥ 0", lambda x: x >= 0, False, "{x ∈ ℤ : x ≥ 0}"),
+    Predicado("", "x < 0", lambda x: x < 0, False, "{x ∈ ℤ : x < 0}"),
     Predicado("", "x² = 9", lambda x: x * x == 9, True, ""),
     Predicado("", "x² − 16 = 0", lambda x: x * x - 16 == 0, True, ""),
     Predicado("", "2x + 1 = 5", lambda x: 2 * x + 1 == 5, True, ""),
@@ -54,12 +55,28 @@ BANCO: List[Predicado] = [
     Predicado("", "x² + 1 = 0", lambda x: x * x + 1 == 0, True, ""),
     Predicado("", "|x| < 3", lambda x: abs(x) < 3, True, ""),
     Predicado("", "|x| ≤ 4", lambda x: abs(x) <= 4, True, ""),
-    Predicado("", "x es par", lambda x: x % 2 == 0, False, "{x ∈ Z : x es par}"),
-    Predicado("", "x es impar", lambda x: x % 2 != 0, False, "{x ∈ Z : x es impar}"),
-    Predicado("", "x es múltiplo de 3", lambda x: x % 3 == 0, False, "{x ∈ Z : 3 | x}"),
-    Predicado("", "x² > 4", lambda x: x * x > 4, False, "{x ∈ Z : x < −2 ∨ x > 2}"),
-    Predicado("", "x ≤ 1", lambda x: x <= 1, False, "{x ∈ Z : x ≤ 1}"),
+    Predicado("", "x es par", lambda x: x % 2 == 0, False, "{x ∈ ℤ : x es par}"),
+    Predicado("", "x es impar", lambda x: x % 2 != 0, False, "{x ∈ ℤ : x es impar}"),
+    Predicado("", "x es múltiplo de 3", lambda x: x % 3 == 0, False, "{x ∈ ℤ : 3 | x}"),
+    Predicado("", "x² > 4", lambda x: x * x > 4, False, "{x ∈ ℤ : x < −2 ∨ x > 2}"),
+    Predicado("", "x ≤ 1", lambda x: x <= 1, False, "{x ∈ ℤ : x ≤ 1}"),
 ]
+
+
+def _n(x: int) -> str:
+    """Escribe el entero con el signo menos tipográfico."""
+    return str(x).replace("-", "−")
+
+
+def _sustituir(texto: str, valor: int) -> str:
+    """Reemplaza la x del predicado por un valor concreto.
+
+    Cuando la x viene precedida por un coeficiente hay que escribir el producto:
+    2x con x = 4 es «2·4 − …», no «24 − …».
+    """
+    escrito = _n(valor) if valor >= 0 else f"({_n(valor)})"
+    texto = re.sub(r"(\d)x", r"\1·" + escrito, texto)
+    return texto.replace("x", escrito)
 
 
 @dataclass
@@ -110,11 +127,13 @@ def _construir_item(
         contra = next((x for x, v in por_modulo if not v), None)
         if contra is not None:
             just = (
-                f"**Falsa.** Contraejemplo: x = {contra}. "
-                f"Ahí {p.nombre}(x) es {'V' if p.func(contra) else 'F'} "
-                f"(porque {p.texto.replace('x', f'({contra})')} es "
+                f"**Falsa.** Contraejemplo: x = {_n(contra)}. "
+                f"Ahí {p.nombre}({_n(contra)}) es {'V' if p.func(contra) else 'F'} "
+                f"(porque «{_sustituir(p.texto, contra)}» es "
                 f"{'verdadero' if p.func(contra) else 'falso'}) y "
-                f"{q.nombre}(x) es {'V' if q.func(contra) else 'F'}, "
+                f"{q.nombre}({_n(contra)}) es {'V' if q.func(contra) else 'F'} "
+                f"(porque «{_sustituir(q.texto, contra)}» es "
+                f"{'verdadero' if q.func(contra) else 'falso'}), "
                 f"de modo que el cuerpo del cuantificador resulta F. "
                 f"Un solo contraejemplo alcanza para refutar un ∀."
             )
@@ -130,7 +149,7 @@ def _construir_item(
                 )
             else:
                 detalles = ", ".join(
-                    f"x = {x} (allí {q.nombre}(x) es "
+                    f"x = {_n(x)} (allí {q.nombre}({_n(x)}) es "
                     f"{'V' if q.func(x) else 'F'})"
                     for x in soporte
                 )
@@ -149,8 +168,9 @@ def _construir_item(
     testigo = next((x for x, v in por_modulo if v), None)
     if testigo is not None:
         just = (
-            f"**Verdadera.** Testigo: x = {testigo}. Allí {p.nombre}(x) es "
-            f"{'V' if p.func(testigo) else 'F'} y {q.nombre}(x) es "
+            f"**Verdadera.** Testigo: x = {_n(testigo)}. Allí {p.nombre}({_n(testigo)}) es "
+            f"{'V' if p.func(testigo) else 'F'} (porque «{_sustituir(p.texto, testigo)}» es "
+            f"{'verdadero' if p.func(testigo) else 'falso'}) y {q.nombre}({_n(testigo)}) es "
             f"{'V' if q.func(testigo) else 'F'}, con lo cual el cuerpo del cuantificador "
             f"resulta V. Para un ∃ basta exhibir un elemento del universo que lo cumpla."
         )
@@ -168,7 +188,7 @@ def _construir_item(
             )
         else:
             detalles = ", ".join(
-                f"x = {x} (allí {otro.nombre}(x) es F)" for x in soporte
+                f"x = {_n(x)} (allí {otro.nombre}({_n(x)}) es F)" for x in soporte
             )
             just = (
                 f"**Falsa.** Para que la conjunción sea verdadera hace falta, en particular, "
@@ -205,10 +225,22 @@ def generar_items(rng: random.Random, cantidad: int = 3) -> Tuple[List[Predicado
         rng.shuffle(combinaciones)
         items: List[ItemCuantificado] = []
         vistos = set()
+        pares_usados = set()
         for c, f, a, b in combinaciones:
+            # Un mismo par de predicados puede dar proposiciones equivalentes
+            # entre sí (por ejemplo ∀x:[p→¬q] y ∀x:[q→¬p]): se usa una sola vez.
+            par = frozenset((a, b))
+            if par in pares_usados:
+                continue
             item = _construir_item(c, f, preds[a], preds[b])
             if item is None or item.enunciado in vistos:
                 continue
+            # A lo sumo un ítem verdadero "por vacuidad": dos seguidos se
+            # resuelven igual y el ejercicio pierde variedad.
+            vacuo = "por vacuidad" in item.justificacion
+            if vacuo and any("por vacuidad" in x.justificacion for x in items):
+                continue
+            pares_usados.add(par)
             vistos.add(item.enunciado)
             items.append(item)
             if len(items) == cantidad:
