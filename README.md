@@ -150,6 +150,28 @@ En modo examen el servidor además **filtra** el payload visual con una lista
 blanca por tipo de ejercicio: sin eso, las regiones ya contadas del Venn o los
 elementos particulares del Hasse regalarían la respuesta.
 
+## Deploy en Vercel
+
+El repo ya viene configurado para desplegarse tal cual: Next.js y la función
+Python conviven en un mismo proyecto.
+
+1. En Vercel: **Add New → Project → Import** el repositorio `tutor-mat-1`.
+2. Dejar todo como viene (framework Next.js, detectado solo) y **Deploy**.
+
+No hace falta configurar variables de entorno ni el comando de build.
+
+Cómo está armado:
+
+- `api/index.py` se despliega como función serverless de Python. `vercel.json`
+  usa `includeFiles` para que el paquete `mategen` viaje dentro de la función,
+  que si no quedaría afuera del bundle.
+- El rewrite de `vercel.json` manda `/api/*` a esa función.
+- `next.config.ts` desactiva su propio rewrite cuando detecta la variable
+  `VERCEL`, así en producción no compite con el anterior. Fuera de Vercel —
+  tanto `next dev` como `next start` en tu máquina— apunta al uvicorn local.
+
+Una vez importado, cada push a `main` despliega solo.
+
 ## Tests
 
 ```bash
