@@ -39,8 +39,23 @@ def _numero(valor) -> Optional[float]:
         return None
 
 
+def _vacio(valor) -> bool:
+    """¿El alumno dejó esto sin contestar?
+
+    Ojo con los falsos vacíos: en verdadero/falso, `False` es una respuesta; en
+    numérica, `0` también. Sólo cuentan como vacíos None y la cadena vacía.
+    """
+    return valor is None or (isinstance(valor, str) and not valor.strip())
+
+
 def corregir(practica: Dict, respuesta: Any) -> Dict:
-    """Corrige un ejercicio. Devuelve aciertos, total y el detalle por ítem."""
+    """Corrige un ejercicio. Devuelve aciertos, total y el detalle por ítem.
+
+    Cada ítem del detalle informa `respondido`: no es lo mismo equivocarse que
+    dejar en blanco. Quien deja en blanco no debería recibir la respuesta
+    servida —sería regalarle el ejercicio por apretar Corregir sin querer—, y el
+    frontend usa ese dato para mostrar «sin responder» en vez del resultado.
+    """
     tipo = (practica or {}).get("tipo")
     if not tipo:
         return {"aciertos": 0, "total": 0, "detalle": [], "sin_correccion": True}
@@ -50,68 +65,84 @@ def corregir(practica: Dict, respuesta: Any) -> Dict:
     if tipo in ("verdadero-falso", "nombrar-ley", "nombrar-regla"):
         dadas = _normalizar_lista(respuesta)
         for i, item in enumerate(practica.get("items", [])):
-            esperado = item["correcta"]
             dado = dadas[i] if i < len(dadas) else None
+            respondido = not _vacio(dado)
             detalle.append({
-                "esperado": esperado,
+                "esperado": item["correcta"],
                 "dado": dado,
-                "correcto": dado is not None and dado == esperado,
+                "respondido": respondido,
+                "correcto": respondido and dado == item["correcta"],
                 "etiqueta": item.get("enunciado") or _etiqueta_ley(item),
             })
 
     elif tipo == "numerica":
         dadas = _normalizar_lista(respuesta)
         for i, item in enumerate(practica.get("items", [])):
-            dado = _numero(dadas[i]) if i < len(dadas) else None
+            crudo = dadas[i] if i < len(dadas) else None
+            respondido = not _vacio(crudo)
+            dado = _numero(crudo) if respondido else None
             detalle.append({
                 "esperado": item["valor"],
                 "dado": dado,
+                "respondido": respondido,
                 "correcto": dado is not None and dado == float(item["valor"]),
                 "etiqueta": item["texto"],
             })
 
     elif tipo == "propiedades":
+        # Acá el formulario entero es una sola respuesta: si el alumno tocó algo,
+        # lo que dejó sin marcar significa "no la cumple", que es justo lo que
+        # promete la interfaz. Si no tocó nada, no contestó.
         correctas = practica.get("correctas", {})
-        dadas = respuesta if isinstance(respuesta, dict) else {}
+        respondido = isinstance(respuesta, dict)
+        dadas = respuesta if respondido else {}
         for nombre in practica.get("propiedades", []):
             esperado = correctas.get(nombre)
-            dado = dadas.get(nombre)
+            dado = bool(dadas.get(nombre, False)) if respondido else None
             detalle.append({
                 "esperado": esperado,
                 "dado": dado,
-                "correcto": dado is not None and bool(dado) == bool(esperado),
+                "respondido": respondido,
+                "correcto": respondido and dado == bool(esperado),
                 "etiqueta": nombre,
             })
 
     elif tipo == "si-no":
         esperado = practica.get("correcta")
-        correcto = respuesta is not None and bool(respuesta) == bool(esperado)
+        respondido = respuesta is not None
         detalle.append({
             "esperado": esperado,
             "dado": respuesta,
-            "correcto": correcto,
+            "respondido": respondido,
+            "correcto": respondido and bool(respuesta) == bool(esperado),
             "etiqueta": practica.get("pregunta", ""),
         })
 
     elif tipo == "opcion-multiple":
         esperado = practica.get("correcta")
-        dado = respuesta if isinstance(respuesta, int) else None
+        respondido = isinstance(respuesta, int) and not isinstance(respuesta, bool)
+        dado = respuesta if respondido else None
         detalle.append({
             "esperado": esperado,
             "dado": dado,
-            "correcto": dado == esperado,
+            "respondido": respondido,
+            "correcto": respondido and dado == esperado,
             "etiqueta": practica.get("pregunta", ""),
         })
 
     elif tipo == "elementos-particulares":
+        # Acá None es una respuesta legítima ("no tiene"), así que no alcanza
+        # con mirar si el valor es nulo: hay que ver si la clave está.
         dadas = respuesta if isinstance(respuesta, dict) else {}
         for pregunta in practica.get("preguntas", []):
-            esperado = pregunta["correcta"]          # puede ser None: "no tiene"
-            dado = dadas.get(pregunta["clave"], "__sin responder__")
+            esperado = pregunta["correcta"]
+            respondido = pregunta["clave"] in dadas
+            dado = dadas.get(pregunta["clave"]) if respondido else None
             detalle.append({
                 "esperado": esperado,
-                "dado": dado if dado != "__sin responder__" else None,
-                "correcto": dado != "__sin responder__" and dado == esperado,
+                "dado": dado,
+                "respondido": respondido,
+                "correcto": respondido and dado == esperado,
                 "etiqueta": pregunta["texto"],
             })
 
@@ -121,10 +152,12 @@ def corregir(practica: Dict, respuesta: Any) -> Dict:
         for campo in practica.get("campos", []):
             esperado = correctas.get(campo, [])
             dado = dadas.get(campo)
+            respondido = not _vacio(dado)
             detalle.append({
                 "esperado": esperado,
                 "dado": dado,
-                "correcto": _iguales_conjunto(dado, esperado),
+                "respondido": respondido,
+                "correcto": respondido and _iguales_conjunto(dado, esperado),
                 "etiqueta": campo,
             })
 
@@ -134,10 +167,12 @@ def corregir(practica: Dict, respuesta: Any) -> Dict:
         for i, izquierda in enumerate(practica.get("izquierda", [])):
             esperado = correctas[i] if i < len(correctas) else None
             dado = dadas[i] if i < len(dadas) else None
+            respondido = not _vacio(dado)
             detalle.append({
                 "esperado": esperado,
                 "dado": dado,
-                "correcto": dado is not None and dado == esperado,
+                "respondido": respondido,
+                "correcto": respondido and dado == esperado,
                 "etiqueta": izquierda,
             })
 

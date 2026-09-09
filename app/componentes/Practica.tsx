@@ -44,6 +44,12 @@ export function Practica({
     onCambio?.(actual);
   }
 
+  /** Neutro si quedó en blanco; verde o rojo sólo si de verdad contestó. */
+  function colorBorde(item?: DetalleItem): string {
+    if (!item || !item.respondido) return "var(--color-borde)";
+    return item.correcto ? "var(--color-bien)" : "var(--color-mal)";
+  }
+
   const lista = Array.isArray(respuesta) ? respuesta : [];
   const objeto =
     respuesta && typeof respuesta === "object" && !Array.isArray(respuesta)
@@ -109,11 +115,7 @@ export function Practica({
                   onChange={(e) => actualizarLista(i, e.target.value.replace(/[^\d-]/g, ""))}
                   className="w-28 rounded-lg border px-3 py-1.5"
                   style={{
-                    borderColor: marca(i)
-                      ? marca(i)!.correcto
-                        ? "var(--color-bien)"
-                        : "var(--color-mal)"
-                      : "var(--color-borde)",
+                    borderColor: colorBorde(marca(i)),
                     background: "var(--color-papel)",
                     fontFamily: "var(--font-codigo)",
                   }}
@@ -150,11 +152,7 @@ export function Practica({
                 onChange={(e) => actualizarLista(i, Number(e.target.value))}
                 className="w-full rounded-lg border px-3 py-1.5 text-sm"
                 style={{
-                  borderColor: marca(i)
-                    ? marca(i)!.correcto
-                      ? "var(--color-bien)"
-                      : "var(--color-mal)"
-                    : "var(--color-borde)",
+                  borderColor: colorBorde(marca(i)),
                   background: "var(--color-papel)",
                 }}
               >
@@ -226,11 +224,7 @@ export function Practica({
                 }
                 className="rounded-lg border px-3 py-1.5 text-sm"
                 style={{
-                  borderColor: marca(i)
-                    ? marca(i)!.correcto
-                      ? "var(--color-bien)"
-                      : "var(--color-mal)"
-                    : "var(--color-borde)",
+                  borderColor: colorBorde(marca(i)),
                   background: "var(--color-papel)",
                 }}
               >
@@ -259,11 +253,7 @@ export function Practica({
                 onChange={(e) => actualizarObjeto(campo, e.target.value)}
                 className="flex-1 rounded-lg border px-3 py-1.5"
                 style={{
-                  borderColor: marca(i)
-                    ? marca(i)!.correcto
-                      ? "var(--color-bien)"
-                      : "var(--color-mal)"
-                    : "var(--color-borde)",
+                  borderColor: colorBorde(marca(i)),
                   background: "var(--color-papel)",
                   fontFamily: "var(--font-codigo)",
                 }}
@@ -288,11 +278,7 @@ export function Practica({
                 onChange={(e) => actualizarLista(i, e.target.value)}
                 className="rounded-lg border px-3 py-1.5 text-sm"
                 style={{
-                  borderColor: marca(i)
-                    ? marca(i)!.correcto
-                      ? "var(--color-bien)"
-                      : "var(--color-mal)"
-                    : "var(--color-borde)",
+                  borderColor: colorBorde(marca(i)),
                   background: "var(--color-papel)",
                   fontFamily: "var(--font-codigo)",
                 }}
@@ -344,7 +330,7 @@ function Opciones({
 }
 
 function estiloBoton(activo: boolean, marca?: DetalleItem) {
-  if (marca && activo) {
+  if (marca?.respondido && activo) {
     return {
       borderColor: marca.correcto ? "var(--color-bien)" : "var(--color-mal)",
       background: marca.correcto ? "var(--color-bien)" : "var(--color-mal)",
@@ -367,6 +353,20 @@ function Veredicto({
   etiquetas?: Record<string, string>;
 }) {
   if (!item) return null;
+
+  // Dejar en blanco no es equivocarse: no se muestra la respuesta, porque si no
+  // un toque sin querer en «Corregir» te regala el ejercicio.
+  if (!item.respondido) {
+    return (
+      <span
+        className="text-[0.78rem] whitespace-nowrap italic"
+        style={{ color: "var(--color-suave)" }}
+      >
+        sin responder
+      </span>
+    );
+  }
+
   const esperado = formatear(item.esperado, etiquetas);
   return (
     // Sin .chip: pasaría a mayúsculas, y en {a, b, c} eso cambia los elementos.

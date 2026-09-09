@@ -397,6 +397,55 @@ class TestCorreccion(unittest.TestCase):
             resultado = correccion.corregir(ej.practica, None)
             self.assertEqual(resultado["aciertos"], 0, clave)
 
+    def test_en_blanco_no_es_lo_mismo_que_equivocarse(self):
+        """Sin esta distinción, apretar Corregir sin querer regala la respuesta.
+
+        El frontend usa `respondido` para mostrar «sin responder» en vez de
+        servir la solución de un ítem que ni se intentó.
+        """
+        for clave, generador in GENERADORES.items():
+            ej = generador(random.Random(2))
+            en_blanco = correccion.corregir(ej.practica, None)
+            for item in en_blanco["detalle"]:
+                self.assertFalse(
+                    item["respondido"], f"{clave}: un ítem vacío quedó como respondido"
+                )
+                self.assertFalse(item["correcto"], clave)
+
+            correctas = self._respuestas_correctas(ej.practica)
+            contestado = correccion.corregir(ej.practica, correctas)
+            for item in contestado["detalle"]:
+                self.assertTrue(
+                    item["respondido"], f"{clave}: una respuesta dada quedó sin marcar"
+                )
+
+    def test_el_cero_y_el_falso_cuentan_como_respuesta(self):
+        """Los falsos vacíos: 0 en una numérica y F en un verdadero/falso."""
+        for clave in ("venn", "cuantificadores"):
+            ej = GENERADORES[clave](random.Random(3))
+            cantidad = len(ej.practica["items"])
+            valor = 0 if ej.practica["tipo"] == "numerica" else False
+            resultado = correccion.corregir(ej.practica, [valor] * cantidad)
+            for item in resultado["detalle"]:
+                self.assertTrue(
+                    item["respondido"],
+                    f"{clave}: {valor!r} se tomó como no contestado",
+                )
+
+    def test_en_propiedades_lo_no_marcado_significa_que_no_cumple(self):
+        """Es lo que promete la interfaz, así que el corrector debe respetarlo."""
+        for s in range(10):
+            ej = GENERADORES["relacion-propiedades"](random.Random(s))
+            correctas = ej.practica["correctas"]
+            # Se marcan sólo las que valen: las demás quedan sin marcar.
+            solo_las_que_valen = {k: True for k, v in correctas.items() if v}
+            resultado = correccion.corregir(ej.practica, solo_las_que_valen)
+            self.assertEqual(
+                resultado["aciertos"],
+                resultado["total"],
+                f"semilla {s}: no marcar una propiedad falsa debería ser correcto",
+            )
+
     def test_examen_completo_da_cien_y_cero(self):
         for modo in MODOS:
             examen = generar_examen(modo=modo, semilla=77)

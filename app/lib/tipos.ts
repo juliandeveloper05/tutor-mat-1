@@ -292,6 +292,8 @@ export interface Catalogo {
 export interface DetalleItem {
   esperado: unknown;
   dado: unknown;
+  /** Distingue "se equivocó" de "lo dejó en blanco". */
+  respondido: boolean;
   correcto: boolean;
   etiqueta: string;
 }
