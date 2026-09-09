@@ -43,7 +43,12 @@ export function RectaReal({
   return (
     <div>
       {etiqueta && (
-        <p className="chip mb-1" style={{ color: "var(--color-suave)" }}>
+        // Sin .chip: esa clase pasa a mayúsculas y acá hay matemática, donde
+        // x y X son símbolos distintos.
+        <p
+          className="mb-1 text-[0.82rem]"
+          style={{ color: "var(--color-suave)", fontFamily: "var(--font-codigo)" }}
+        >
           {etiqueta}
         </p>
       )}

@@ -169,7 +169,7 @@ export function Visual({
 
     case "dominio":
       return (
-        <Recuadro titulo={visual.funcion}>
+        <Recuadro titulo={visual.funcion} formula>
           {visual.dominio && <RectaReal dominio={visual.dominio} etiqueta={`Dom f = ${visual.dominio.texto}`} />}
           {visual.muestras && (
             <div className="mt-3">
@@ -181,7 +181,7 @@ export function Visual({
 
     case "funcion-inversa":
       return (
-        <Recuadro titulo={visual.funcion}>
+        <Recuadro titulo={visual.funcion} formula>
           {visual.muestras_f && (
             <Curva
               mostrarIdentidad
@@ -212,12 +212,12 @@ export function Visual({
       return (
         <div className="space-y-3">
           {visual.gf && (
-            <Recuadro titulo={visual.gf.texto}>
+            <Recuadro titulo={visual.gf.texto} formula>
               <RectaReal dominio={visual.gf.dominio} etiqueta={`Dom = ${visual.gf.dominio.texto}`} />
             </Recuadro>
           )}
           {visual.fg && (
-            <Recuadro titulo={visual.fg.texto}>
+            <Recuadro titulo={visual.fg.texto} formula>
               <RectaReal dominio={visual.fg.dominio} etiqueta={`Dom = ${visual.fg.dominio.texto}`} />
             </Recuadro>
           )}
@@ -234,7 +234,7 @@ export function Visual({
     case "relacion":
     case "equivalencia":
       return (
-        <Recuadro titulo={`R sobre A = {${visual.A.join(", ")}}`}>
+        <Recuadro titulo={`R sobre A = {${visual.A.join(", ")}}`} formula>
           <MatrizRelacion A={visual.A} pares={visual.pares} />
         </Recuadro>
       );
@@ -266,10 +266,25 @@ export function Visual({
   }
 }
 
-function Recuadro({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function Recuadro({
+  titulo,
+  formula = false,
+  children,
+}: {
+  titulo: string;
+  /** El título es una fórmula: no se pasa a mayúsculas (x y X no son lo mismo). */
+  formula?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div>
-      <p className="chip mb-2" style={{ color: "var(--color-suave)" }}>
+      <p
+        className={formula ? "mb-2 text-[0.9rem]" : "chip mb-2"}
+        style={{
+          color: "var(--color-suave)",
+          ...(formula ? { fontFamily: "var(--font-codigo)" } : {}),
+        }}
+      >
         {titulo}
       </p>
       {children}
