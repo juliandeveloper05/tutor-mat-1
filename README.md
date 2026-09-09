@@ -1,11 +1,24 @@
 # Generador de Integradores — Matemática I
 
+### → **[tutor-mat-1.vercel.app](https://tutor-mat-1.vercel.app)**
+
 Generador automático de exámenes integradores de **Matemática I** (Tecnicatura /
-Licenciatura en Informática, UNQ), con la **resolución explicada paso a paso**.
+Licenciatura en Informática, UNQ), con la **resolución explicada paso a paso**
+y los diagramas dibujados.
 
 Los ejercicios se arman siguiendo el estilo y la dificultad de los trabajos
 prácticos y de los parciales de la cátedra: Lógica, Conjuntos, Relaciones y
 Funciones.
+
+Se puede usar de tres formas: desde la web, por línea de comandos, o pegándole
+a la API.
+
+| | |
+|---|---|
+| Practicar con los diagramas | [tutor-mat-1.vercel.app](https://tutor-mat-1.vercel.app) |
+| Un integrador ya armado | [/examen/2026?modo=integrador](https://tutor-mat-1.vercel.app/examen/2026?modo=integrador) |
+| Rendirlo sin resolución | […&soluciones=false](https://tutor-mat-1.vercel.app/examen/2026?modo=integrador&soluciones=false) |
+| Generar en papel | `python3 integrador.py -f html -o examen.html` |
 
 ## Empezar (no hay nada que instalar)
 
@@ -150,15 +163,14 @@ En modo examen el servidor además **filtra** el payload visual con una lista
 blanca por tipo de ejercicio: sin eso, las regiones ya contadas del Venn o los
 elementos particulares del Hasse regalarían la respuesta.
 
-## Deploy en Vercel
+## Deploy
 
-El repo ya viene configurado para desplegarse tal cual: Next.js y la función
-Python conviven en un mismo proyecto.
+Está desplegado en **[tutor-mat-1.vercel.app](https://tutor-mat-1.vercel.app)**
+y cada push a `main` lo actualiza solo. No hay variables de entorno ni comando
+de build que configurar.
 
-1. En Vercel: **Add New → Project → Import** el repositorio `tutor-mat-1`.
-2. Dejar todo como viene (framework Next.js, detectado solo) y **Deploy**.
-
-No hace falta configurar variables de entorno ni el comando de build.
+Para levantar otra copia: en Vercel, **Add New → Project → Import** el
+repositorio y **Deploy**; el framework se detecta solo.
 
 Cómo está armado:
 

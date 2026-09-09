@@ -286,6 +286,12 @@ def _practica_sin_respuestas(practica: Dict) -> Dict:
     for clave, valor in practica.items():
         if clave in ocultas:
             continue
+        # Los árboles de fórmulas se copian tal cual: adentro "valor" es el
+        # valor de verdad de una constante (V o F), no una respuesta. Sin esta
+        # excepción, F y V quedaban indistinguibles en el árbol.
+        if clave == "arbol":
+            limpio[clave] = valor
+            continue
         if isinstance(valor, list):
             limpio[clave] = [
                 _practica_sin_respuestas(v) if isinstance(v, dict) else v

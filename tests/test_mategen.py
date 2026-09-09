@@ -253,6 +253,29 @@ class TestSerializacion(unittest.TestCase):
                 self.assertIsNotNone(permitidas, f"{clave}: tipo visual sin lista blanca")
                 self.assertLessEqual(set(datos["visual"]), set(permitidas), clave)
 
+    def test_el_modo_examen_no_rompe_los_arboles_de_formulas(self):
+        """Dentro de un árbol, "valor" es el valor de verdad de una constante.
+
+        El filtro de respuestas no puede confundirlo con una solución: si lo
+        borra, V y F quedan indistinguibles en el árbol serializado.
+        """
+
+        def constantes_sin_valor(nodo):
+            if not isinstance(nodo, dict):
+                return False
+            if nodo.get("tipo") == "const" and "valor" not in nodo:
+                return True
+            return any(constantes_sin_valor(v) for v in nodo.values())
+
+        for clave in ("simplificacion", "identidad"):
+            for s in range(20):
+                ej = GENERADORES[clave](random.Random(s))
+                datos = serial.ejercicio_a_json(ej, con_soluciones=False)
+                self.assertFalse(
+                    constantes_sin_valor(datos["practica"]),
+                    f"{clave} (semilla {s}): se perdió el valor de una constante",
+                )
+
     def test_las_opciones_multiples_tienen_una_sola_correcta(self):
         for clave in ("dominio", "simplificacion", "derivacion", "identidad"):
             for s in range(15):
