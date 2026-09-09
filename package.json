@@ -1,0 +1,35 @@
+{
+  "name": "tutor-mat-1",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Generador visual de integradores de Matemática I (TUPI/UNQ)",
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,magenta \"next dev\" \"npm run dev:api\"",
+    "dev:web": "next dev",
+    "dev:api": "uvicorn api.index:app --reload --port 8000",
+    "build": "next build",
+    "start": "next start",
+    "test": "python3 -m unittest discover -s tests"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
+    "katex": "^0.18.7",
+    "next": "^16.3.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.5.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@types/three": "^0.185.4",
+    "concurrently": "^10.0.5",
+    "playwright": "^1.63.0",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2"
+  }
+}

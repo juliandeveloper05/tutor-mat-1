@@ -891,26 +891,31 @@ def ej_relacion_orden(rng: random.Random) -> Ejercicio:
     return ej
 
 
-def _practica_particulares(o, B) -> Dict:
-    """Elegir máximo, mínimo, supremo e ínfimo del subconjunto.
+def _practica_particulares(o, B, nombre: str = "B") -> Dict:
+    """Elegir máximo, mínimo, supremo e ínfimo del conjunto.
 
     «No tiene» es una opción legítima y es justamente la que más se falla: la
     diferencia entre maximal y máximo se juega ahí.
+
+    `nombre` es cómo se llama el conjunto en el enunciado: en el ejercicio de
+    orden es un subconjunto B, pero en el de P(A) se pregunta por todo P(A) y
+    hablar de "B" ahí no tendría sentido.
     """
     p = serial.particulares_a_json(o, B)
     etiquetas = dict(o.etiquetas)
     return {
         "tipo": "elementos-particulares",
+        "nombre_conjunto": nombre,
         "subconjunto": list(B),
         "etiquetas": etiquetas,
         "opciones": list(o.elems),
         "preguntas": [
-            {"clave": clave, "texto": texto, "correcta": p[clave]}
-            for clave, texto in (
-                ("maximo", "Máximo de B"),
-                ("minimo", "Mínimo de B"),
-                ("supremo", "Supremo de B"),
-                ("infimo", "Ínfimo de B"),
+            {"clave": clave, "texto": f"{etiqueta} de {nombre}", "correcta": p[clave]}
+            for clave, etiqueta in (
+                ("maximo", "Máximo"),
+                ("minimo", "Mínimo"),
+                ("supremo", "Supremo"),
+                ("infimo", "Ínfimo"),
             )
         ],
     }
@@ -1003,7 +1008,7 @@ def ej_integrador_partes(rng: random.Random) -> Ejercicio:
         "particulares": serial.particulares_a_json(o, todos),
         "conjunto_base": base,
     }
-    ej.practica = _practica_particulares(o, todos)
+    ej.practica = _practica_particulares(o, todos, nombre="P(A)")
     return ej
 
 

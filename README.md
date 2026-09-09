@@ -73,6 +73,49 @@ calculan**, y después se vuelven a comprobar por un camino independiente.
 
 Cada ejercicio del examen termina con una línea que dice cómo fue verificado.
 
+## La aplicación web
+
+Los ejercicios dibujados, con la resolución que se va revelando paso a paso y la
+posibilidad de contestar y corregirse.
+
+```bash
+pip install -r requirements.txt
+npm install
+npm run dev          # levanta Next en :3000 y el backend Python en :8000
+```
+
+| Qué | Dónde |
+|---|---|
+| Elegir modo, unidad y semilla | `/` |
+| Recorrer un examen | `/examen/2026?modo=integrador` |
+| Rendirlo sin resolución | `/examen/2026?modo=integrador&soluciones=false` |
+
+**El visual acompaña al stepper, no se adelanta.** El diagrama de Venn arranca
+vacío y las regiones se completan recién en el paso donde se deducen; la cadena
+de equivalencias no muestra el nombre de la ley del paso que todavía no abriste;
+la tabla de elementos particulares del Hasse aparece al final. Sin eso el panel
+de "Contestá vos" sería copiar la respuesta que está al lado.
+
+Las visualizaciones:
+
+- **Diagrama de Venn** en SVG, con las ocho regiones dibujadas de forma exacta
+  (intersección por `clipPath` anidado y resta por máscara, no aproximada a ojo).
+- **Diagrama de Hasse en 3D** con Three.js. Cuando el orden es la inclusión
+  sobre P(A) con #A = 3, los vértices van en las coordenadas exactas del cubo y
+  el conjunto se rota para que la diagonal (1,1,1) —la dirección en la que crece
+  la inclusión— quede vertical: así es a la vez el cubo real y un Hasse que se
+  lee de abajo hacia arriba. Se gira con el mouse.
+- **Recta real** con los extremos abiertos y cerrados como corresponde, y los
+  puntos excluidos marcados aparte.
+- **Cadena de equivalencias** con el detalle de qué se reescribió en cada paso.
+- **Gráficos de funciones** con los puntos muestreados desde Python: donde la
+  función no está definida se levanta el trazo en vez de unir ramas que no van
+  unidas.
+
+El 3D se usa **sólo** para los diagramas de Hasse, que es donde aporta; el resto
+es SVG, que se lee mejor. Si no hay WebGL, el Hasse cae a un diagrama por
+niveles en texto que dice lo mismo.
+
 ## API
 
 Además de la CLI, el generador se expone por HTTP para la aplicación web. La API
@@ -121,6 +164,11 @@ de forma independiente sobre decenas de semillas distintas.
 ```
 integrador.py              CLI
 api/index.py               API HTTP (FastAPI)
+app/                       aplicación Next.js (TypeScript)
+  page.tsx                 elegir qué practicar
+  examen/[semilla]/        recorrer el examen
+  componentes/visuales/    Venn, Hasse 3D, recta real, cadena, curvas
+  lib/tipos.ts             tipos espejo del JSON de mategen/serial.py
 mategen/
   examen.py                arma los exámenes y redacta cada ejercicio
   serial.py                serialización a JSON para el frontend
