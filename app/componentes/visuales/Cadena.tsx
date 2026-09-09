@@ -66,32 +66,42 @@ export function Cadena({
                 onElegir?.(i);
               }}
               className={clases(
-                "flex w-full items-start gap-3 rounded-lg py-1.5 text-left transition",
-                "cursor-pointer",
+                // En pantalla angosta la fórmula y el nombre de la ley no
+                // entran uno al lado del otro: se apilan. Si compiten por el
+                // ancho, la fórmula queda exprimida en una columna de dos
+                // caracteres y la ley se corta.
+                "flex w-full cursor-pointer flex-col gap-0.5 rounded-lg py-1.5",
+                "text-left transition sm:flex-row sm:items-start sm:gap-3",
               )}
               style={{
                 background: esActivo ? "var(--color-acento-suave)" : "transparent",
                 paddingInline: esActivo ? "0.5rem" : 0,
               }}
             >
-              <span
-                className="w-5 shrink-0 text-center"
-                style={{ color: "var(--color-suave)", fontFamily: "var(--font-codigo)" }}
-              >
-                {yaVisto ? simbolo : ""}
+              <span className="flex min-w-0 flex-1 items-start gap-3">
+                <span
+                  className="w-5 shrink-0 text-center"
+                  style={{ color: "var(--color-suave)", fontFamily: "var(--font-codigo)" }}
+                >
+                  {yaVisto ? simbolo : ""}
+                </span>
+                <span className="min-w-0 flex-1">
+                  {yaVisto ? (
+                    <Mate
+                      latex={paso.completa.latex}
+                      texto={paso.completa.texto}
+                      className="text-[1.05rem]"
+                    />
+                  ) : (
+                    <span
+                      className="inline-block h-4 w-full max-w-[14rem] rounded"
+                      style={{ background: "var(--color-borde)", opacity: 0.5 }}
+                    />
+                  )}
+                </span>
               </span>
-              <span className="flex-1">
-                {yaVisto ? (
-                  <Mate latex={paso.completa.latex} texto={paso.completa.texto} className="text-[1.05rem]" />
-                ) : (
-                  <span
-                    className="inline-block h-4 w-full max-w-[14rem] rounded"
-                    style={{ background: "var(--color-borde)", opacity: 0.5 }}
-                  />
-                )}
-              </span>
               <span
-                className="chip shrink-0 pt-1"
+                className="chip shrink-0 pl-8 sm:pl-0 sm:pt-1"
                 style={{ color: esActivo ? "var(--color-acento)" : "var(--color-suave)" }}
               >
                 {yaVisto ? `(${i + 1}) ${paso.ley}` : `(${i + 1})`}

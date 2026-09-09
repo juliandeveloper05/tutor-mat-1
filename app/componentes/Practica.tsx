@@ -241,7 +241,7 @@ export function Practica({
                   </option>
                 ))}
               </select>
-              <Veredicto item={marca(i)} />
+              <Veredicto item={marca(i)} etiquetas={practica.etiquetas} />
             </li>
           ))}
         </ul>
@@ -358,22 +358,34 @@ function estiloBoton(activo: boolean, marca?: DetalleItem) {
   };
 }
 
-function Veredicto({ item }: { item?: DetalleItem }) {
+function Veredicto({
+  item,
+  etiquetas,
+}: {
+  item?: DetalleItem;
+  /** Traduce claves internas a lo que ve el alumno: s7 → {a, b, c}. */
+  etiquetas?: Record<string, string>;
+}) {
   if (!item) return null;
+  const esperado = formatear(item.esperado, etiquetas);
   return (
+    // Sin .chip: pasaría a mayúsculas, y en {a, b, c} eso cambia los elementos.
     <span
-      className={clases("chip")}
+      className="text-[0.78rem] font-semibold whitespace-nowrap"
       style={{ color: item.correcto ? "var(--color-bien)" : "var(--color-mal)" }}
-      title={item.correcto ? undefined : `Correcta: ${formatear(item.esperado)}`}
+      title={item.correcto ? undefined : `Correcta: ${esperado}`}
     >
-      {item.correcto ? "✔" : `✕ ${formatear(item.esperado)}`}
+      {item.correcto ? "✔" : `✕ ${esperado}`}
     </span>
   );
 }
 
-function formatear(valor: unknown): string {
-  if (valor === null) return "no tiene";
+function formatear(valor: unknown, etiquetas?: Record<string, string>): string {
+  if (valor === null || valor === undefined) return "no tiene";
   if (typeof valor === "boolean") return valor ? "V" : "F";
-  if (Array.isArray(valor)) return valor.join(", ");
-  return String(valor);
+  if (Array.isArray(valor)) {
+    return valor.map((v) => formatear(v, etiquetas)).join(", ");
+  }
+  const texto = String(valor);
+  return etiquetas?.[texto] ?? texto;
 }
